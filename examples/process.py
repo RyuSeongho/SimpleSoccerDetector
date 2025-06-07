@@ -7,12 +7,14 @@ from color_picker import get_dominant_colors, RealTimeColorDisplay, integrate_re
 from compactness_filter import remove_low_compactness
 import watershed as ws
 from object_detection import extract_player_bounding_boxes, merge_nearby_boxes, draw_player_boxes
+from tracker import PlayerTracker
 import matplotlib
 matplotlib.use("TkAgg")
 
 def process_video(video_path):
     cap = cv2.VideoCapture(video_path)
     color_display = RealTimeColorDisplay()
+    player_tracker = PlayerTracker()
     index = 0
     while cap.isOpened():
         ret, frame = cap.read()
@@ -29,6 +31,7 @@ def process_video(video_path):
         if(index == 1):
             all_mask = np.ones_like(frame, dtype=np.uint8) * 255
             dominant_colors = integrate_realtime_colors(frame, all_mask, color_display)
+            player_tracker.setColor(dominant_colors)
         
 
         # HSV 변환 및 초록색 제거
@@ -146,29 +149,50 @@ def process_video(video_path):
         #player_boxes = ws.improved_watershed(combined_mask, min_connection_width=3)  
         merged_boxes = merge_nearby_boxes(player_boxes, merge_threshold=25)
         
-        # frame에 combined_mask를 적용하여 최종 결과 생성
-        final_mask = cv2.cvtColor(combined_mask, cv2.COLOR_GRAY2BGR)
-        combined_colored = cv2.bitwise_and(frame, final_mask)
+        if index % 10 == 1:
+            for box in merged_boxes:
+                player_tracker.register(box, frame)
+
+
+
+
+
+        # ----- 새로운 추적 파이프라인 -----
         
-        # **선수 bounding box를 combined_colored에 그리기**
-        combined_colored_with_boxes = draw_player_boxes(combined_colored, merged_boxes, 
-                                                       color=(0, 255, 255), thickness=2)
+        # 1. 탐지 결과로 기존 플레이어들 업데이트 및 새 플레이어 등록
+        player_tracker.update(frame, threshold=0.5, padding=16)
         
-        # 원본 프레임에도 bounding box 표시
-        frame_with_boxes = draw_player_boxes(frame, merged_boxes, 
-                                           color=(255, 0, 0), thickness=2)
+        # 2. 현재 추적 중인 플레이어들 가져오기
+        stable_boxes, confidences, object_ids = player_tracker.get_current_boxes()
+
+        # ----- 시각화 -----
+        # 기존 탐지 결과 표시
+        frame_with_original = draw_player_boxes(frame.copy(), merged_boxes, 
+                                              color=(255, 0, 0), thickness=2)
+        cv2.putText(frame_with_original, f"Object Detection: {len(merged_boxes)}", 
+                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
         
-        # Mask spectator region (above cutoff_row) to remove audience area
-        combined_mask[:cutoff_row, :] = 0
-        
-        # 정보 표시
-        cv2.rectangle(combined_colored_with_boxes, (0, 0), (640, 360), (0, 255, 0), 2)
-        cv2.putText(combined_colored_with_boxes, f"Players Detected: {len(merged_boxes)}", 
+        # 추적 결과 표시
+        frame_with_stable = frame.copy()
+        for i, (box, conf, obj_id) in enumerate(zip(stable_boxes, confidences, object_ids)):
+            x1, y1, w, h = map(int, box)
+            if conf > 0.8:
+                color = (0, 255, 0)  # 초록 - 최근 탐지됨
+            elif conf > 0.5:
+                color = (0, 255, 255)  # 노랑 - 보통 품질
+            else:
+                color = (0, 0, 255)  # 빨강 - 품질 낮음
+            
+            cv2.rectangle(frame_with_stable, (x1, y1), (x1+w, y1 + h), color, 2)
+            cv2.putText(frame_with_stable, f'ID:{obj_id} ({conf:.1f})', 
+                       (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        cv2.putText(frame_with_stable, f"Player Tracking: {len(stable_boxes)}", 
                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        cv2.putText(combined_colored_with_boxes, "Final Result with Bounding Boxes", 
-                   (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-        
+
         # 화면 출력
+        cv2.imshow("Object Detection", frame_with_original)
+        cv2.imshow("Player Tracking", frame_with_stable)
         cv2.imshow("Final Result with Boxes", combined_colored_with_boxes)
         cv2.imshow("Original with Boxes", frame_with_boxes)
 
@@ -188,7 +212,6 @@ def process_video(video_path):
             print(f"Frame: {len(merged_boxes)} players detected")
             for i, (x, y, w, h) in enumerate(merged_boxes):
                 print(f"  Player {i+1}: ({x}, {y}) - {w}x{h}")
-
         
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -196,6 +219,43 @@ def process_video(video_path):
 
     cap.release()
     cv2.destroyAllWindows()
+
+
+def print_binary_detection(combined_mask, frame, merged_boxes):
+    # frame에 combined_mask를 적용하여 최종 결과 생성
+    final_mask = cv2.cvtColor(combined_mask, cv2.COLOR_GRAY2BGR)
+    combined_colored = cv2.bitwise_and(frame, final_mask)
+    
+    # **선수 bounding box를 combined_colored에 그리기**
+    combined_colored_with_boxes = draw_player_boxes(combined_colored, merged_boxes, 
+                                                    color=(0, 255, 255), thickness=2)
+    
+    # 원본 프레임에도 bounding box 표시
+    frame_with_boxes = draw_player_boxes(frame, merged_boxes, 
+                                        color=(255, 0, 0), thickness=2)
+    
+    
+    # 정보 표시
+    cv2.rectangle(combined_colored_with_boxes, (0, 0), (640, 360), (0, 255, 0), 2)
+    cv2.putText(combined_colored_with_boxes, f"Players Detected: {len(merged_boxes)}", 
+                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    cv2.putText(combined_colored_with_boxes, "Final Result with Bounding Boxes", 
+                (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+    
+
+    
+    # 화면 출력
+    cv2.imshow("Final Result with Boxes", combined_colored_with_boxes)
+    cv2.imshow("Original with Boxes", frame_with_boxes)
+
+
+    
+    # 선수 정보 출력
+    if merged_boxes:
+        print(f"Frame: {len(merged_boxes)} players detected")
+        for i, (x, y, w, h) in enumerate(merged_boxes):
+            print(f"  Player {i+1}: ({x}, {y}) - {w}x{h}")
+
 
 if __name__ == "__main__":
     process_video("soccer_video2.mp4")

@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import cv2
 
-def get_dominant_colors(image, mask, n_colors=3):
-    """numpy만 사용하여 dominant 색상 추출"""
+def get_dominant_colors(image, mask, n_colors=3, color_space="hsv"):
+    """numpy만 사용하여 dominant 색상 추출, color_space 지원"""
     # 마스크 영역의 픽셀만 추출
     masked_pixels = image[mask == 255]
     
@@ -26,15 +26,40 @@ def get_dominant_colors(image, mask, n_colors=3):
     
     for i in range(min(n_colors, len(unique_colors))):
         idx = sorted_indices[i]
-        color_bgr = unique_colors[idx]
-        color_rgb = color_bgr[::-1]  # BGR to RGB
+        color = unique_colors[idx]
+        
+        # color_space에 따라 변환
+        if color_space.lower() == "rgb":
+            color_rgb = tuple(color[::-1])  # BGR to RGB
+            color_bgr = tuple(color)
+        elif color_space.lower() == "bgr":
+            color_bgr = tuple(color)
+            color_rgb = tuple(color[::-1])
+        elif color_space.lower() == "hsv":
+            # BGR to HSV 변환
+            color_bgr_np = np.uint8([[color]])
+            color_hsv_np = cv2.cvtColor(color_bgr_np, cv2.COLOR_BGR2HSV)
+            color_hsv = tuple(int(c) for c in color_hsv_np[0, 0])
+            color_bgr = tuple(color)
+            color_rgb = tuple(color[::-1])
+        else:
+            # 기본은 BGR
+            color_bgr = tuple(color)
+            color_rgb = tuple(color[::-1])
+        
         percentage = counts[idx] / total_pixels
         
-        result.append({
-            'color_bgr': tuple(color_bgr),
-            'color_rgb': tuple(color_rgb),
+        color_info = {
+            'color_bgr': color_bgr,
+            'color_rgb': color_rgb,
             'percentage': percentage
-        })
+        }
+        
+        # HSV 색상 공간인 경우 HSV 값도 추가
+        if color_space.lower() == "hsv":
+            color_info['color_hsv'] = color_hsv
+        
+        result.append(color_info)
     
     return result
 
@@ -70,13 +95,13 @@ class RealTimeColorDisplay:
         self.ax2.set_ylim(0, 1)
         self.ax2.axis('off')
         
-    def update_display(self, color_info):
+    def update_display(self, color_info, color_space="hsv"):
         # 이전 플롯 지우기
         self.ax1.clear()
         self.ax2.clear()
         
         # 축 설정 재적용
-        self.ax1.set_title('Top 3 Dominant Colors (Real-time)')
+        self.ax1.set_title(f'Top 3 Dominant Colors (Real-time) - {color_space.upper()}')
         self.ax1.set_xlim(0, 400)
         self.ax1.set_ylim(0, 100)
         self.ax1.axis('off')
@@ -93,12 +118,21 @@ class RealTimeColorDisplay:
             color_bar_rgb = color_bar / 255.0  # 0-1 범위로 정규화
             self.ax1.imshow(color_bar_rgb, aspect='auto', extent=[0, 400, 0, 100])
             
-            # 색상 정보 텍스트 표시
+            # 색상 정보 텍스트 표시 (color_space에 따라)
             text_info = ""
             for i, info in enumerate(color_info):
-                rgb = info['color_rgb']
-                percentage = info['percentage']
-                text_info += f"Color {i+1}: RGB{rgb} - {percentage:.1%}\n"
+                if color_space.lower() == "rgb":
+                    color_val = info['color_rgb']
+                    text_info += f"Color {i+1}: RGB{color_val} - {info['percentage']:.1%}\n"
+                elif color_space.lower() == "bgr":
+                    color_val = info['color_bgr']
+                    text_info += f"Color {i+1}: BGR{color_val} - {info['percentage']:.1%}\n"
+                elif color_space.lower() == "hsv":
+                    color_val = info.get('color_hsv', info['color_bgr'])
+                    text_info += f"Color {i+1}: HSV{color_val} - {info['percentage']:.1%}\n"
+                else:
+                    color_val = info['color_bgr']
+                    text_info += f"Color {i+1}: BGR{color_val} - {info['percentage']:.1%}\n"
             
             self.ax2.text(0.05, 0.8, text_info, fontsize=12, 
                          verticalalignment='top', fontfamily='monospace')
@@ -107,81 +141,59 @@ class RealTimeColorDisplay:
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
-# 실시간 비디오 처리에 통합하는 방법
-def process_video_with_realtime_colors(video_path):
-    import cv2  # 비디오 처리용
-    
-    cap = cv2.VideoCapture(video_path)
-    color_display = RealTimeColorDisplay()
-    
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        
-        frame = cv2.resize(frame, (640, 360))
-        
-        # 여기에 기존의 마스크 생성 로직 추가
-        # 예시로 간단한 마스크 생성
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        lower_bound = np.array([0, 50, 50])
-        upper_bound = np.array([180, 255, 255])
-        mask = cv2.inRange(hsv, lower_bound, upper_bound)
-        
-        # Top 3 dominant colors 추출
-        dominant_colors = get_dominant_colors(frame, mask, n_colors=3)
-        
-        # 실시간 색상 display 업데이트
-        color_display.update_display(dominant_colors)
-        
-        # OpenCV 창에도 결과 표시
-        cv2.imshow('Original', frame)
-        cv2.imshow('Mask', mask)
-        
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-    
-    cap.release()
-    cv2.destroyAllWindows()
-    plt.close('all')
-
-# 기존 코드에 통합하는 간단한 방법
-def integrate_realtime_colors(frame, combined_mask, color_display):
+def integrate_realtime_colors(frame, combined_mask, color_display, color_space="hsv"):
     """
     기존 process_video 함수에 추가할 수 있는 함수.
-    get_dominant_colors가 {'color_rgb': (R, G, B), 'percentage': ...} 형태로 반환한다고 가정.
+    color_space에 따라 지정된 형식으로 dominant color 반환
+    
+    Args:
+        frame: 원본 프레임 (BGR)
+        combined_mask: 마스크
+        color_display: RealTimeColorDisplay 객체
+        color_space: "rgb", "bgr", "hsv" 중 하나
+    
+    Returns:
+        지정된 color_space의 가장 우세한 색상 튜플
     """
     
     # Top 3 dominant colors 추출
-    dominant_colors = get_dominant_colors(frame, combined_mask, n_colors=3)
+    dominant_colors = get_dominant_colors(frame, combined_mask, n_colors=3, color_space=color_space)
     
     # 실시간 display 업데이트
-    color_display.update_display(dominant_colors)
+    color_display.update_display(dominant_colors, color_space)
     
-    # 콘솔에도 출력 (RGB 기준)
+    # 콘솔에도 출력 (지정된 color_space 기준)
     if dominant_colors:
-        print("Top 3 Colors (RGB):")
+        print(f"Top 3 Colors ({color_space.upper()}):")
         for i, color in enumerate(dominant_colors):
-            rgb = color['color_rgb']
-            print(f"  {i+1}. RGB{rgb} - {color['percentage']:.1%}")
+            if color_space.lower() == "rgb":
+                color_val = color['color_rgb']
+            elif color_space.lower() == "bgr":
+                color_val = color['color_bgr']
+            elif color_space.lower() == "hsv":
+                color_val = color.get('color_hsv', color['color_bgr'])
+            else:
+                color_val = color['color_bgr']
+            
+            print(f"  {i+1}. {color_space.upper()}{color_val} - {color['percentage']:.1%}")
     
     # dominant_colors가 비어있으면 None 반환
     if not dominant_colors:
         return None
     
-    # 가장 우세한 색상을 찾아서 BGR 형식으로 변환하여 반환
-    # - 'color_rgb'가 (R, G, B) 형태라고 가정
-    # - OpenCV는 (B, G, R) 순서를 사용하므로 순서만 뒤집어 줌
+    # 가장 우세한 색상을 지정된 color_space로 반환
     dominant_colors.sort(key=lambda x: x['percentage'], reverse=True)
-    top_bgr = dominant_colors[0]['color_bgr']  # 예: (R, G, B)
-
-    # HSV로 변환
-    top_bgr_np = np.uint8([[list(top_bgr)]])  # 1x1 이미지로 변환
-    top_hsv_np = cv2.cvtColor(top_bgr_np, cv2.COLOR_BGR2HSV)
-    top_hsv = tuple(int(c) for c in top_hsv_np[0, 0])
+    top_color = dominant_colors[0]
     
-    
-    return top_hsv
+    if color_space.lower() == "rgb":
+        return top_color['color_rgb']
+    elif color_space.lower() == "bgr":
+        return top_color['color_bgr']
+    elif color_space.lower() == "hsv":
+        return top_color.get('color_hsv', top_color['color_bgr'])
+    else:
+        # 기본은 BGR
+        return top_color['color_bgr']
 
 
 # 사용 예제
