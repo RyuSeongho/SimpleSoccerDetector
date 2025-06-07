@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from video_uniform import process_video_uniform
+from video_uniform import process_video_uniform, process_video_uniform_pxCount, process_video_uniform_pxCount_70
 from ball import detect_ball
 from blur import apply_blur, remove_spectator_region
 from color_picker import get_dominant_colors, RealTimeColorDisplay, integrate_realtime_colors
@@ -8,6 +8,8 @@ from compactness_filter import remove_low_compactness
 import watershed as ws
 from object_detection import extract_player_bounding_boxes, merge_nearby_boxes, draw_player_boxes
 from tracker import PlayerTracker
+import matplotlib
+matplotlib.use("TkAgg")
 
 def process_video(video_path):
     cap = cv2.VideoCapture(video_path)
@@ -191,7 +193,25 @@ def process_video(video_path):
         # 화면 출력
         cv2.imshow("Object Detection", frame_with_original)
         cv2.imshow("Player Tracking", frame_with_stable)
+        cv2.imshow("Final Result with Boxes", combined_colored_with_boxes)
+        cv2.imshow("Original with Boxes", frame_with_boxes)
 
+        # 유니폼 기반 추출 결과
+        # edges_uniform = process_video_uniform2_imp(frame, merged_boxes)
+        # cv2.imshow("original3", edges_uniform)  # 바운딩 박스가 그려진 원본
+
+        # process_video_uniform2_imp(frame, merged_boxes)
+        # cv2.imshow("masked_teams", frame)
+        #cv2.imshow("pxCount_masked_teams", frame)
+
+        process_video_uniform_pxCount_70(frame, merged_boxes)
+        cv2.imshow("pxCount_masked_teams", frame)
+
+        # 선수 정보 출력
+        if merged_boxes:
+            print(f"Frame: {len(merged_boxes)} players detected")
+            for i, (x, y, w, h) in enumerate(merged_boxes):
+                print(f"  Player {i+1}: ({x}, {y}) - {w}x{h}")
         
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
