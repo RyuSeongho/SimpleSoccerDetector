@@ -1,15 +1,14 @@
 import cv2
 import numpy as np
 
-def draw_bounding_boxes(frame, mask, grass_color, color=(0, 255, 0), min_area=10, tolerance=30):
-    """마스크에서 윤곽선을 찾아 바운딩 박스를 그립니다."""
+def get_bounding_boxes(frame, mask, grass_color, min_area=10, tolerance=30):
+    """마스크에서 바운딩 박스들을 찾아 반환합니다."""
     # 윤곽선 검출
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
-    # 결과 프레임 복사
-    result = frame.copy()
+    bounding_boxes = []
     
-    # 각 윤곽선에 대해 바운딩 박스 그리기
+    # 각 윤곽선에 대해 바운딩 박스 추출
     for cnt in contours:
         area = cv2.contourArea(cnt)
         if area > min_area:  # 작은 노이즈 제거
@@ -17,8 +16,27 @@ def draw_bounding_boxes(frame, mask, grass_color, color=(0, 255, 0), min_area=10
             
             # 바운딩 박스가 필드 위에 있는지 확인
             if is_on_field(frame, x, y, w, h, grass_color, tolerance):
-                # 바운딩 박스 그리기
-                cv2.rectangle(result, (x, y), (x + w, y + h), color, 2)
+                bounding_boxes.append((x, y, w, h))
+    
+    print(f"Found {len(bounding_boxes)} bounding boxes")
+    return bounding_boxes
+
+def draw_boxes_on_frame(frame, bounding_boxes, color=(0, 255, 0)):
+    """프레임에 바운딩 박스들을 그려서 반환합니다."""
+    result = frame.copy()
+    
+    for x, y, w, h in bounding_boxes:
+        cv2.rectangle(result, (x, y), (x + w, y + h), color, 2)
+    
+    return result
+
+def draw_bounding_boxes(frame, mask, grass_color, color=(0, 255, 0), min_area=10, tolerance=30):
+    """마스크에서 윤곽선을 찾아 바운딩 박스를 그립니다. (기존 호환성을 위해 유지)"""
+    # 바운딩 박스 추출
+    bounding_boxes = get_bounding_boxes(frame, mask, grass_color, min_area, tolerance)
+    
+    # 바운딩 박스 그리기
+    result = draw_boxes_on_frame(frame, bounding_boxes, color)
     
     return result
 
