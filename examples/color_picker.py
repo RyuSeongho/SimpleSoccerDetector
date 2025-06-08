@@ -169,7 +169,8 @@ def integrate_realtime_colors(frame, combined_mask, color_display, color_space="
             if color_space.lower() == "rgb":
                 color_val = color['color_rgb']
             elif color_space.lower() == "bgr":
-                color_val = color['color_bgr']
+                # add 16 to each channel
+                color_val = tuple(c + 16 for c in color['color_bgr'])
             elif color_space.lower() == "hsv":
                 color_val = color.get('color_hsv', color['color_bgr'])
             else:
@@ -186,9 +187,11 @@ def integrate_realtime_colors(frame, combined_mask, color_display, color_space="
     top_color = dominant_colors[0]
     
     if color_space.lower() == "rgb":
-        return top_color['color_rgb']
+        # add 16 to each channel
+        return tuple(c + 16 for c in top_color['color_rgb'])
     elif color_space.lower() == "bgr":
-        return top_color['color_bgr']
+        # add 16 to each channel
+        return tuple(c + 16 for c in top_color['color_bgr'])
     elif color_space.lower() == "hsv":
         return top_color.get('color_hsv', top_color['color_bgr'])
     else:
