@@ -10,6 +10,7 @@ class PlayerTracker:
         self.objects = {}      # {object_id: {'centroid': (x,y), 'bbox': (x1,y1,x2,y2), 'template': np.array}}
         self.current_frame = 0
         self.grass_color = grass_color
+        self.consecutive_failures = {}  # 각 객체별 연속 실패 횟수를 추적
 
     def setColor(self, grass_color):
         """플레이어 추적에 사용할 잔디 색상 설정"""
@@ -129,9 +130,6 @@ class PlayerTracker:
         # 템플릿 추출 시 올바른 좌표 사용 (전체 bbox)
         template = frame[y:y + h, x:x + w]  # [y:y+h, x:x+w] 순서 주의
 
-        if self.current_frame == 0:
-            cv2.imwrite(f"template_{self.next_object_id}.png", template)
-            cv2.imwrite(f"center_patch_{self.next_object_id}.png", center_patch)
         
         # 중앙 5x5 패치에서 히스토그램 계산
         center_histogram = cv2.calcHist([center_patch], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
@@ -142,6 +140,7 @@ class PlayerTracker:
             'template': template.copy(),
             'histogram': center_histogram  
         }
+        self.consecutive_failures[self.next_object_id] = 0  # 새로운 객체의 실패 횟수 초기화
         print(f"새 플레이어 등록: ID {self.next_object_id} at {centroid}")
         self.next_object_id += 1
         return True
@@ -151,6 +150,7 @@ class PlayerTracker:
         """플레이어 등록 해제"""
         print(f"플레이어 제거: ID {object_id}")
         del self.objects[object_id]
+        del self.consecutive_failures[object_id]  # 실패 횟수도 함께 제거
         
     def is_inside_existing_player(self, centroid):
         """새 탐지점이 기존 등록된 플레이어 영역 안에 있는지 확인"""
@@ -241,7 +241,6 @@ class PlayerTracker:
                         best_score = correlation
                         best_position = (search_x, search_y)
             
-
             # 4. 점수가 threshold보다 높으면 업데이트
             if best_score >= histogram_threshold and best_position is not None:
                 search_x, search_y = best_position
@@ -269,7 +268,9 @@ class PlayerTracker:
                 
                 if self.is_color_similar_to_grass(new_template):
                     print(f"새로운 템플릿이 잔디 색상과 유사하여 업데이트하지 않음")
-                    objects_to_remove.append(obj_id)
+                    self.consecutive_failures[obj_id] += 1
+                    if self.consecutive_failures[obj_id] >= 5:
+                        objects_to_remove.append(obj_id)
                     continue
                 
                 # 객체 정보 업데이트
@@ -279,11 +280,17 @@ class PlayerTracker:
                 self.objects[obj_id]['template'] = new_template.copy()
                 #self.objects[obj_id]['histogram'] = new_histogram
                 
+                # 성공적으로 추적했으므로 실패 횟수 초기화
+                self.consecutive_failures[obj_id] = 0
                 
             else:
-                # 5. 점수가 낮으면 추적 중지 대상으로 표시
-                print(f"Object ID {obj_id} tracking failed: histogram score {best_score:.3f} < threshold {histogram_threshold}")
-                objects_to_remove.append(obj_id)
+                # 5. 점수가 낮으면 실패 횟수 증가
+                self.consecutive_failures[obj_id] += 1
+                print(f"Object ID {obj_id} tracking failed: histogram score {best_score:.3f} < threshold {histogram_threshold} (연속 실패: {self.consecutive_failures[obj_id]}/5)")
+                
+                # 5번 연속 실패 시에만 제거 대상으로 표시
+                if self.consecutive_failures[obj_id] >= 5:
+                    objects_to_remove.append(obj_id)
         
         # 추적 실패한 객체들 제거
         for obj_id in objects_to_remove:

@@ -1,7 +1,6 @@
 # video_uniform.py
 import cv2
 import numpy as np
-from sklearn.cluster import KMeans
 
 def process_video_uniform(frame):
     # 프레임 리사이즈
