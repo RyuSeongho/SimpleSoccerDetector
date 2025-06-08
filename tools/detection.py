@@ -18,7 +18,6 @@ def get_bounding_boxes(frame, mask, grass_color, min_area=10, tolerance=30):
             if is_on_field(frame, x, y, w, h, grass_color, tolerance):
                 bounding_boxes.append((x, y, w, h))
     
-    print(f"Found {len(bounding_boxes)} bounding boxes")
     return bounding_boxes
 
 def draw_boxes_on_frame(frame, bounding_boxes, color=(0, 255, 0)):
