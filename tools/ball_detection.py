@@ -57,8 +57,66 @@ def is_ball_candidate(contour, min_area: int = 4, max_area: int = 64,
     return True
 
 
+def is_near_player(ball_center: Tuple[int, int], player_bboxes: List[Tuple[int, int, int, int]], 
+                   distance_threshold: int = 20) -> bool:
+    """공 중심점이 선수 bbox 안에 있거나 너무 가까운지 확인"""
+    if not player_bboxes:
+        return False
+    
+    ball_x, ball_y = ball_center
+    
+    for bbox in player_bboxes:
+        px, py, pw, ph = bbox
+        
+        # bbox 안에 있는지 확인
+        if px <= ball_x <= px + pw and py <= ball_y <= py + ph:
+            return True
+        
+        # bbox 근처에 있는지 확인 (확장된 영역)
+        expanded_x1 = px - distance_threshold
+        expanded_y1 = py - distance_threshold
+        expanded_x2 = px + pw + distance_threshold
+        expanded_y2 = py + ph + distance_threshold
+        
+        if expanded_x1 <= ball_x <= expanded_x2 and expanded_y1 <= ball_y <= expanded_y2:
+            return True
+    
+    return False
+
+
+def is_on_field(ball_center: Tuple[int, int], grass_mask: np.ndarray, 
+                surrounding_radius: int = 15) -> bool:
+    """공 위치 주변이 잔디(필드)인지 확인"""
+    if grass_mask is None:
+        return True  # 잔디 마스크가 없으면 모든 위치 허용
+    
+    ball_x, ball_y = ball_center
+    height, width = grass_mask.shape
+    
+    # 경계 체크
+    if ball_x < 0 or ball_x >= width or ball_y < 0 or ball_y >= height:
+        return False
+    
+    # 주변 영역 정의
+    x1 = max(0, ball_x - surrounding_radius)
+    y1 = max(0, ball_y - surrounding_radius)
+    x2 = min(width, ball_x + surrounding_radius + 1)
+    y2 = min(height, ball_y + surrounding_radius + 1)
+    
+    # 주변 영역에서 잔디 픽셀 비율 계산
+    surrounding_area = grass_mask[y1:y2, x1:x2]
+    if surrounding_area.size == 0:
+        return False
+    
+    grass_ratio = np.sum(surrounding_area > 0) / surrounding_area.size
+    
+    # 주변의 60% 이상이 잔디이면 필드로 간주
+    return grass_ratio > 0.6
+
+
 def detect_ball(frame: np.ndarray, grass_mask: np.ndarray = None, 
-                ball_color: Tuple[int, int, int] = None, debug: bool = False) -> List[Tuple[int, int, int, int]]:
+                ball_color: Tuple[int, int, int] = None, debug: bool = False,
+                player_bboxes: List[Tuple[int, int, int, int]] = None) -> List[Tuple[int, int, int, int]]:
     """프레임에서 축구공 감지 (SimpleBlobDetector 기반으로 고립된 흰색 원 감지)"""
     
     ball_candidates = []
@@ -70,6 +128,7 @@ def detect_ball(frame: np.ndarray, grass_mask: np.ndarray = None,
     ball_mask = cv2.GaussianBlur(ball_mask, (3, 3), 0)
 
     gray = cv2.Canny(gray, 50, 150)
+    cv2.imshow("Canny", gray)
 
     # grass_mask가 제공된 경우 사용, 없으면 전체 영역 사용
     if grass_mask is not None:
@@ -130,11 +189,23 @@ def detect_ball(frame: np.ndarray, grass_mask: np.ndarray = None,
         if (bbox_x >= 0 and bbox_y >= 0 and 
             bbox_x + bbox_size < frame.shape[1] and bbox_y + bbox_size < frame.shape[0]):
             
+            # 선수 근처인지 확인
+            ball_center = (int(x), int(y))
+            if player_bboxes and is_near_player(ball_center, player_bboxes):
+                if debug:
+                    print(f"Ball candidate rejected (near player): center=({int(x)},{int(y)})")
+                continue
+            
+            # 필드 위에 있는지 확인 (관중석 제거)
+            if not is_on_field(ball_center, grass_mask):
+                if debug:
+                    print(f"Ball candidate rejected (not on field): center=({int(x)},{int(y)})")
+                continue
+            
             ball_candidates.append((bbox_x, bbox_y, bbox_size, bbox_size))
 
-
             if debug:
-                print(f"Ball candidate: center=({int(x)},{int(y)}), size={size:.1f}, bbox=({bbox_x},{bbox_y},{bbox_size},{bbox_size})")
+                print(f"Ball candidate accepted: center=({int(x)},{int(y)}), size={size:.1f}, bbox=({bbox_x},{bbox_y},{bbox_size},{bbox_size})")
     
     if debug:
         print(f"Final ball candidates: {len(ball_candidates)}")

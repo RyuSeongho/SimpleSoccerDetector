@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
 import argparse
-from examples.color_picker import RealTimeColorDisplay, integrate_realtime_colors
+from tools.color_picker import RealTimeColorDisplay, integrate_realtime_colors
 from tools.color_utils import bgr_range, create_uniform_mask
-from tools.detection import draw_bounding_boxes, get_bounding_boxes, draw_boxes_on_frame
+from tools.detection import get_bounding_boxes, draw_boxes_on_frame
 from tools.player_tracker import PlayerTrackerManager
 from tools.ball_detection import detect_ball, draw_ball_detection, filter_ball_by_field_position
 from tools.ball_tracker import BallTrackerManager
@@ -58,6 +58,7 @@ def process_video(video_path, team1_color_rgb, team2_color_rgb, ball_color_rgb=N
     cv2.namedWindow("Team 2", cv2.WINDOW_NORMAL)
     cv2.namedWindow("Tracked Players", cv2.WINDOW_NORMAL)
     cv2.namedWindow("Ball Detection", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("Ball Trackers", cv2.WINDOW_NORMAL)
 
     # 첫 프레임 플래그 (tracker_debug_mode에서만 사용)
     is_first_frame = True
@@ -99,16 +100,13 @@ def process_video(video_path, team1_color_rgb, team2_color_rgb, ball_color_rgb=N
             team1_detected_bboxes = get_bounding_boxes(frame, mask_team1_final, dominant_colors)
             team2_detected_bboxes = get_bounding_boxes(frame, mask_team2_final, dominant_colors)
             
-            # 공 감지
-            detected_ball_bboxes = detect_ball(frame, mask_green, ball_color_bgr, debug=True)
+            # 공 감지 (선수 bbox와 관중석 필터링 포함)
+            all_player_bboxes = team1_detected_bboxes + team2_detected_bboxes
+            detected_ball_bboxes = detect_ball(frame, mask_green, ball_color_bgr, player_bboxes=all_player_bboxes, debug=True)
             detected_ball_bboxes = filter_ball_by_field_position(detected_ball_bboxes, frame.shape)
             
             # 공 추적 업데이트
             ball_tracker_manager.update_ball_tracking(detected_ball_bboxes, tracker_manager, frame, frame_count)
-            
-            # 추적된 공 바운딩 박스 가져오기
-            tracked_ball_bbox = ball_tracker_manager.get_ball_bbox()
-            ball_bboxes = [tracked_ball_bbox] if tracked_ball_bbox is not None else []
             
             # 추적 모드에 따른 처리
             if tracker_debug_mode:
@@ -135,8 +133,11 @@ def process_video(video_path, team1_color_rgb, team2_color_rgb, ball_color_rgb=N
             result_tracked = draw_boxes_on_frame(result_tracked, team1_tracked_bboxes, color=(0, 255, 255))  # 노란색
             result_tracked = draw_boxes_on_frame(result_tracked, team2_tracked_bboxes, color=(255, 0, 255))  # 마젠타색
             
-            # 공 감지 결과 그리기
-            result_ball = draw_ball_detection(frame, ball_bboxes, color=(0, 255, 0))  # 초록색
+            # 공 감지 결과 그리기 (원시 감지된 blob들)
+            result_ball = draw_ball_detection(frame, detected_ball_bboxes, color=(0, 255, 0))  # 초록색
+            
+            # Ball Tracker들 시각화
+            result_ball_trackers = ball_tracker_manager.draw_all_trackers(frame, show_window=False)
             
             # 추적 정보 표시
             team1_count, team2_count = tracker_manager.get_tracker_count()
@@ -171,6 +172,7 @@ def process_video(video_path, team1_color_rgb, team2_color_rgb, ball_color_rgb=N
             cv2.imshow("Team 2", result_team2)
             cv2.imshow("Tracked Players", result_tracked)
             cv2.imshow("Ball Detection", result_ball)
+            cv2.imshow("Ball Trackers", result_ball_trackers)
             
             # 키 입력 처리
             key = cv2.waitKey(1) & 0xFF
