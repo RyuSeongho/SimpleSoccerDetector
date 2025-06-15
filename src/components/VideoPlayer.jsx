@@ -9,6 +9,7 @@ const VideoPlayer = () => {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [totalFrames, setTotalFrames] = useState(0);
   const [fps, setFps] = useState(30);
+  const [outputPath, setOutputPath] = useState('');
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -97,10 +98,15 @@ const VideoPlayer = () => {
       if (success) {
         setProgress('분석이 완료되었습니다.');
         setCurrentTime(duration);
+        // 출력 경로 가져오기
+        getOutputPath();
       } else {
         setProgress('분석 중 오류가 발생했습니다.');
       }
     });
+
+    // 컴포넌트 마운트 시 출력 경로 가져오기
+    getOutputPath();
 
     // 컴포넌트 언마운트 시 이벤트 리스너 제거
     return () => {
@@ -113,8 +119,30 @@ const VideoPlayer = () => {
   }, [duration, fps]);
 
   const handleDownload = async (type) => {
-    const path = type === 'video' ? 'output/tracked_video.mp4' : 'output/tracking_data.json';
+    const path = type === 'video' ? 'tracked_video.mp4' : 'tracking_data.json';
     await window.electron.ipcRenderer.invoke(`download-${type}`, path);
+  };
+
+  const handleOpenFolder = async () => {
+    try {
+      const result = await window.electron.ipcRenderer.invoke('open-output-folder');
+      if (!result.success) {
+        console.error('Failed to open folder:', result.error);
+      }
+    } catch (error) {
+      console.error('Error opening folder:', error);
+    }
+  };
+
+  const getOutputPath = async () => {
+    try {
+      const result = await window.electron.ipcRenderer.invoke('get-output-path');
+      if (result.success) {
+        setOutputPath(result.path);
+      }
+    } catch (error) {
+      console.error('Error getting output path:', error);
+    }
   };
 
   const handleTimeChange = (e) => {
@@ -157,8 +185,25 @@ const VideoPlayer = () => {
         >
           JSON 다운로드
         </button>
+        <button
+          className="control-button secondary"
+          onClick={handleOpenFolder}
+        >
+          📁 폴더 열기
+        </button>
       </div>
       <div className="progress">{progress}</div>
+      {outputPath && (
+        <div className="output-path" style={{ 
+          fontSize: '12px', 
+          color: '#666', 
+          marginTop: '10px',
+          textAlign: 'center',
+          wordBreak: 'break-all'
+        }}>
+          출력 위치: {outputPath}
+        </div>
+      )}
     </div>
   );
 };

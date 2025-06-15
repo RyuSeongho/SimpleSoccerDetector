@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -6,11 +6,14 @@ const { spawn } = require('child_process');
 let mainWindow;
 let analyzeWindow;
 
-// 1. Desktop 위치의 output 폴더 생성/반환
+// 1. 시스템별 적절한 output 폴더 생성/반환
 function getOutputDir() {
-  // 사용자의 바탕화면 경로
-  const desktopPath = app.getPath('desktop');
-  const outputDir = path.join(desktopPath, 'output');
+  // 시스템별 적절한 애플리케이션 데이터 경로 사용
+  // macOS: ~/Library/Application Support/Simple Soccer Detector
+  // Windows: %APPDATA%/Simple Soccer Detector
+  // Linux: ~/.local/share/Simple Soccer Detector
+  const appDataPath = app.getPath('userData');
+  const outputDir = path.join(appDataPath, 'output');
 
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -102,19 +105,115 @@ ipcMain.handle('start-analysis', async (event, { videoPath, team1Color, team2Col
 
     createAnalyzeWindow();
 
-    // Python args: main.py 대신 패키징 시 .py 파일이 있는 위치 경로로 바꿀 것
-    const script = path.join(__dirname, 'main.py');
-    const pythonArgs = [
-      script,
-      videoPath,
-      '--team1-color', team1Rgb.r, team1Rgb.g, team1Rgb.b,
-      '--team2-color', team2Rgb.r, team2Rgb.g, team2Rgb.b
-    ].map(String);
+    // 패키징된 앱에서 Python 실행 파일 경로 처리
+    let pythonCmd, pythonArgs;
+    
+    if (app.isPackaged) {
+      // 패키징된 경우: 번들된 실행 파일 사용
+      const executableName = process.platform === 'win32' ? 'soccer_detector.exe' : 'soccer_detector';
+      
+      // 여러 가능한 경로를 시도 (패키징된 앱에서)
+      const possiblePaths = [
+        // asar 압축 해제된 파일들의 위치
+        path.join(process.resourcesPath, 'app.asar.unpacked', 'python-dist', executableName),
+        // 리소스 폴더 직접 접근
+        path.join(process.resourcesPath, 'python-dist', executableName),
+        // 앱 번들 내부
+        path.join(process.resourcesPath, 'app', 'python-dist', executableName),
+        // 백업 경로들
+        path.join(__dirname, 'python-dist', executableName),
+        path.join(app.getAppPath(), 'python-dist', executableName)
+      ];
+      
+      pythonCmd = null;
+      for (const possiblePath of possiblePaths) {
+        if (fs.existsSync(possiblePath)) {
+          pythonCmd = possiblePath;
+          console.log(`Found Python executable at: ${pythonCmd}`);
+          break;
+        }
+      }
+      
+      if (!pythonCmd) {
+        console.error('Python executable not found in any of these paths:');
+        possiblePaths.forEach(p => console.error(`  - ${p}`));
+        throw new Error('Python executable not found');
+      }
+      
+      pythonArgs = [
+        videoPath,
+        '--team1-color', team1Rgb.r, team1Rgb.g, team1Rgb.b,
+        '--team2-color', team2Rgb.r, team2Rgb.g, team2Rgb.b,
+        '--output-dir', outputDir
+      ].map(String);
+    } else {
+      // 개발 모드: Python 스크립트 직접 실행
+      pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+      const script = path.join(__dirname, 'main.py');
+      pythonArgs = [
+        script,
+        videoPath,
+        '--team1-color', team1Rgb.r, team1Rgb.g, team1Rgb.b,
+        '--team2-color', team2Rgb.r, team2Rgb.g, team2Rgb.b,
+        '--output-dir', outputDir
+      ].map(String);
+    }
+    
+    const py = spawn(pythonCmd, pythonArgs, {
+      cwd: app.isPackaged ? process.resourcesPath : __dirname,
+      env: { ...process.env }
+    });
+    console.log('Spawned Python:', pythonCmd, pythonArgs.join(' '));
 
-    const py = spawn('python3', pythonArgs);
-    console.log('Spawned Python:', pythonArgs.join(' '));
+    // Python 프로세스 출력 처리
+    let frameBuffer = Buffer.alloc(0);
+    let expectedFrameSize = 0;
+    let frameWidth = 0;
+    let frameHeight = 0;
+    let headerReceived = false;
 
-    // (비디오 정보 조회, 데이터 수신 등 기존 로직 그대로)
+    py.stdout.on('data', (data) => {
+      frameBuffer = Buffer.concat([frameBuffer, data]);
+      
+      while (frameBuffer.length > 0) {
+        if (!headerReceived && frameBuffer.length >= 8) {
+          // 헤더 읽기: 프레임 크기(4바이트) + 너비(2바이트) + 높이(2바이트)
+          expectedFrameSize = frameBuffer.readUInt32LE(0);
+          frameWidth = frameBuffer.readUInt16LE(4);
+          frameHeight = frameBuffer.readUInt16LE(6);
+          frameBuffer = frameBuffer.slice(8);
+          headerReceived = true;
+        }
+        
+        if (headerReceived && frameBuffer.length >= expectedFrameSize) {
+          // 프레임 데이터 추출
+          const frameData = frameBuffer.slice(0, expectedFrameSize);
+          frameBuffer = frameBuffer.slice(expectedFrameSize);
+          
+          // Electron 렌더러로 프레임 전송
+          if (analyzeWindow && !analyzeWindow.isDestroyed()) {
+            analyzeWindow.webContents.send('frame-data', {
+              data: frameData,
+              width: frameWidth,
+              height: frameHeight
+            });
+          }
+          
+          // 다음 프레임을 위해 리셋
+          headerReceived = false;
+          expectedFrameSize = 0;
+        } else {
+          break; // 더 많은 데이터 필요
+        }
+      }
+    });
+
+    py.stderr.on('data', (data) => {
+      console.log('Python stderr:', data.toString());
+      if (analyzeWindow && !analyzeWindow.isDestroyed()) {
+        analyzeWindow.webContents.send('python-log', data.toString());
+      }
+    });
 
     // 예시: 분석 완료 시 tracked_video.mp4가 outputDir에 생성되었다고 가정
     py.on('close', code => {
@@ -172,4 +271,27 @@ ipcMain.handle('check-video-file', async () => {
   const outputDir = getOutputDir();
   const videoPath = path.join(outputDir, 'tracked_video.mp4');
   return { exists: fs.existsSync(videoPath) };
+});
+
+// 6. 출력 폴더 열기 핸들러
+ipcMain.handle('open-output-folder', async () => {
+  try {
+    const outputDir = getOutputDir();
+    await shell.openPath(outputDir);
+    return { success: true };
+  } catch (err) {
+    console.error('open-output-folder error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// 7. 출력 폴더 경로 가져오기 핸들러
+ipcMain.handle('get-output-path', async () => {
+  try {
+    const outputDir = getOutputDir();
+    return { success: true, path: outputDir };
+  } catch (err) {
+    console.error('get-output-path error:', err);
+    return { success: false, error: err.message };
+  }
 });

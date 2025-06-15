@@ -332,14 +332,15 @@ def main():
     parser.add_argument('video_path', help='Path to input video file')
     parser.add_argument('--team1-color', nargs=3, type=int, help='Team 1 color (RGB)')
     parser.add_argument('--team2-color', nargs=3, type=int, help='Team 2 color (RGB)')
+    parser.add_argument('--output-dir', help='Output directory path', default='output')
     args = parser.parse_args()
 
     # 팀 색상 설정
     team1_color = tuple(args.team1_color) if args.team1_color else (255, 0, 0)
     team2_color = tuple(args.team2_color) if args.team2_color else (0, 0, 255)
 
-    # 출력 경로 설정
-    output_dir = Path('output')
+    # 출력 경로 설정 (인자로 받은 경로 사용)
+    output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
     output_path = output_dir / 'tracked_video.mp4'
 

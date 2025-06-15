@@ -204,6 +204,7 @@
             <p class="text-wrapper-4">
               Supported file types: MP4, MOV, AVI, MKV. Maximum file size: 5GB
             </p>
+            <div id="outputPathInfo" style="margin-top: 10px; font-size: 12px; color: #666; text-align: center; word-break: break-all;"></div>
           </div>
         </div>
         <div class="depth-frame-10">
@@ -245,9 +246,25 @@
       const fileList = document.getElementById('fileList');
       const teamColors = document.getElementById('teamColors');
       const startAnalysis = document.getElementById('startAnalysis');
+      const outputPathInfo = document.getElementById('outputPathInfo');
 
       let currentFile = null;
       const allowedExtensions = ['mp4', 'mov', 'avi', 'mkv'];
+
+      // 페이지 로드 시 출력 경로 표시
+      async function showOutputPath() {
+        try {
+          const result = await window.electron.ipcRenderer.invoke('get-output-path');
+          if (result.success) {
+            outputPathInfo.innerHTML = `📁 결과 파일 저장 위치: ${result.path}`;
+          }
+        } catch (error) {
+          console.error('Error getting output path:', error);
+        }
+      }
+
+      // 페이지 로드 시 실행
+      showOutputPath();
 
       fileTrigger.addEventListener('click', () => fileInput.click());
 
