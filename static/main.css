@@ -1,11 +1,15 @@
 .screen {
   background-color: #fcf7f7;
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
   width: 1920px;
   height: 1080px;
+  transform: scale(0.8);
+  transform-origin: top left;
 
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  /* 화면 가운데로 보이게 offset */
+  transform: translate(-40%, -40%) scale(0.8);
 }
 body {
     width: 1920px;

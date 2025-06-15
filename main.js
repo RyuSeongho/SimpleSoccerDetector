@@ -9,19 +9,20 @@ let pythonProcess;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1920,
+    height: 1080,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
     }
   });
+
 
   mainWindow.loadFile('main.html');
   
   // 개발자 도구 열기
-  mainWindow.webContents.openDevTools();
+  //mainWindow.webContents.openDevTools();
 
   mainWindow.on('closed', function () {
     mainWindow = null;
@@ -30,8 +31,8 @@ function createWindow() {
 
 function createAnalyzeWindow() {
   analyzeWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: 1920,
+    height: 1080,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -42,7 +43,7 @@ function createAnalyzeWindow() {
   analyzeWindow.loadFile('analyze.html');
   
   // 개발자 도구 열기
-  analyzeWindow.webContents.openDevTools();
+  //analyzeWindow.webContents.openDevTools();
 
   analyzeWindow.on('closed', function () {
     analyzeWindow = null;
