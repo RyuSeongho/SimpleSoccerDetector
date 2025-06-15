@@ -10,6 +10,10 @@ from tools.detection import get_bounding_boxes, draw_boxes_on_frame
 from tools.player_tracker import PlayerTrackerManager
 from tools.ball_detection import detect_ball, draw_ball_detection, filter_ball_by_field_position
 from tools.ball_tracker import BallTrackerManager
+import base64
+import sys
+import struct
+from pathlib import Path
 
 def process_video(video_path, team1_color_rgb, team2_color_rgb, ball_color_rgb=None, tracker_debug_mode=False, output_path=None):
     # RGB 입력을 BGR로 변환 (한 번만 변환)
@@ -46,9 +50,9 @@ def process_video(video_path, team1_color_rgb, team2_color_rgb, ball_color_rgb=N
         output_path = os.path.join(output_dir, output_filename)
 
     # JSON 출력 파일 설정
-    json_output_dir = os.path.join(os.path.dirname(output_path), "json")
+    json_output_dir = os.path.dirname(output_path)
     os.makedirs(json_output_dir, exist_ok=True)
-    json_filename = f"tracking_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    json_filename = f"tracking_data.json"
     json_output_path = os.path.join(json_output_dir, json_filename)
 
     # 비디오 작성자 초기화
@@ -257,8 +261,14 @@ def process_video(video_path, team1_color_rgb, team2_color_rgb, ball_color_rgb=N
                 cv2.putText(result_frame, f"Ball Not Tracked", 
                            (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             
-            # 결과 표시
-            cv2.imshow("Soccer Tracking", result_frame)
+            # 프레임 데이터 전송 (Electron으로)
+            frame_bytes = result_frame.tobytes()
+            frame_size = len(frame_bytes)
+            
+            # 프레임 크기와 데이터 전송
+            sys.stdout.buffer.write(struct.pack('<IHH', frame_size, frame_width, frame_height))
+            sys.stdout.buffer.write(frame_bytes)
+            sys.stdout.buffer.flush()
             
             # 결과 프레임 저장
             out.write(result_frame)
@@ -266,24 +276,19 @@ def process_video(video_path, team1_color_rgb, team2_color_rgb, ball_color_rgb=N
             # 진행률 표시
             if frame_count % 30 == 0:  # 30프레임마다 진행률 출력
                 progress = (frame_count / total_frames) * 100
-                print(f"Progress: {progress:.1f}% ({frame_count}/{total_frames})")
+                print(f"Progress: {progress:.1f}% ({frame_count}/{total_frames})", file=sys.stderr)
             
-            # 키 입력 처리
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
-                break
-            elif key == ord('s'):  # s 키로 일시 정지
-                cv2.waitKey(0)
+            # 프레임 카운트 증가
+            frame_count += 1
 
     except Exception as e:
-        print(f"Error occurred: {e}")
+        print(f"Error occurred: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
     finally:
         cap.release()
         out.release()
-        cv2.destroyAllWindows()
-        print(f"Video saved to: {output_path}")
+        print(f"Video saved to: {output_path}", file=sys.stderr)
         
         # JSON 파일 저장
         try:
@@ -302,24 +307,50 @@ def process_video(video_path, team1_color_rgb, team2_color_rgb, ball_color_rgb=N
                     },
                     "frames": tracking_data
                 }, f, indent=2)
-            print(f"Tracking data saved to: {json_output_path}")
+            print(f"Tracking data saved to: {json_output_path}", file=sys.stderr)
         except Exception as e:
-            print(f"Error saving JSON file: {e}")
+            print(f"Error saving JSON file: {e}", file=sys.stderr)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='축구 선수 추적 프로그램')
-    parser.add_argument('video_path', type=str, help='처리할 비디오 파일 경로')
-    parser.add_argument('--team1-color', type=int, nargs=3, required=True,
-                      help='팀1 유니폼 색상 (RGB 형식, 예: 255 0 0)')
-    parser.add_argument('--team2-color', type=int, nargs=3, required=True,
-                      help='팀2 유니폼 색상 (RGB 형식, 예: 0 0 255)')
-    parser.add_argument('--ball-color', type=int, nargs=3,
-                      help='공 색상 (RGB 형식, 예: 255 255 255)')
-    parser.add_argument('--tracker_debug', action='store_true',
-                      help='추적 전용 모드 활성화 (첫 프레임에서만 플레이어 등록)')
-    parser.add_argument('--output-path', type=str,
-                      help='출력 비디오 파일 경로 (지정하지 않으면 output 폴더에 저장)')
+def process_frame(frame, team1_color, team2_color):
+    # 여기에 프레임 처리 로직 추가
+    # 예: 팀 색상 기반으로 선수 추적 등
+    return frame
+
+def send_frame(frame):
+    """프레임을 바이너리로 전송"""
+    # 프레임 크기 정보 전송
+    height, width = frame.shape[:2]
+    size = struct.pack('!II', width, height)
+    sys.stdout.buffer.write(size)
+    sys.stdout.buffer.flush()
     
+    # 프레임 데이터 전송
+    sys.stdout.buffer.write(frame.tobytes())
+    sys.stdout.buffer.flush()
+
+def main():
+    parser = argparse.ArgumentParser(description='Soccer Player Tracking')
+    parser.add_argument('video_path', help='Path to input video file')
+    parser.add_argument('--team1-color', nargs=3, type=int, help='Team 1 color (RGB)')
+    parser.add_argument('--team2-color', nargs=3, type=int, help='Team 2 color (RGB)')
     args = parser.parse_args()
-    
-    process_video(args.video_path, args.team1_color, args.team2_color, args.ball_color, args.tracker_debug, args.output_path)
+
+    # 팀 색상 설정
+    team1_color = tuple(args.team1_color) if args.team1_color else (255, 0, 0)
+    team2_color = tuple(args.team2_color) if args.team2_color else (0, 0, 255)
+
+    # 출력 경로 설정
+    output_dir = Path('output')
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / 'tracked_video.mp4'
+
+    # process_video 함수 호출하여 실제 축구 추적 수행
+    process_video(
+        video_path=args.video_path,
+        team1_color_rgb=team1_color,
+        team2_color_rgb=team2_color,
+        output_path=str(output_path)
+    )
+
+if __name__ == '__main__':
+    main()
