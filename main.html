@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="./static/global.css" />
+    <link rel="stylesheet" href="./static/main.css" />
+    <style>
+      #fileInput {
+        display: none;
+      }
+      .clickable {
+        cursor: pointer;
+      }
+      .depth-frame-3.dragover {
+        border: 2px dashed #007bff;
+        background-color: #f0f8ff;
+      }
+      .file-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 5px 0;
+        padding: 6px 10px;
+        background-color: #f9f9f9;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 14px;
+        width: 100%; 
+      }
+
+      .file-item span {
+        display: block;
+        overflow-wrap: break-word;
+      }
+
+      .file-remove {
+        color: red;
+        font-weight: bold;
+        margin-left: 10px;
+        cursor: pointer;
+        flex-shrink: 0; 
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 30px;
+      }
+
+      .upload-section {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .file-input-container {
+        position: relative;
+        width: 100%;
+      }
+
+      .file-input-container input[type="file"] {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+        z-index: 2;
+      }
+
+      .file-input-container label {
+        display: block;
+        padding: 15px;
+        background-color: #007bff;
+        color: white;
+        text-align: center;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      .file-input-container label:hover {
+        background-color: #0056b3;
+      }
+
+      .team-colors {
+        margin: 20px 0;
+        display: flex;
+        gap: 20px;
+        align-items: center;
+      }
+
+      .color-input-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .color-input-group label {
+        font-weight: bold;
+        color: #333;
+      }
+
+      .color-input-group input[type="color"] {
+        width: 50px;
+        height: 50px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      .start-button {
+        margin-top: 20px;
+        padding: 12px 24px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      .start-button:hover {
+        background-color: #0056b3;
+      }
+
+      .start-button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+
+      #selectedFileName {
+        margin-top: 10px;
+        text-align: center;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="screen">
+      <div class="div">
+        <div class="depth-frame">
+          <div class="depth-frame-wrapper">
+            <div class="div-wrapper">
+              <div class="text-wrapper">Upload your File</div>
+            </div>
+          </div>
+          <div class="depth-frame-2">
+            <div class="depth-frame-3" id="dropZone">
+              <div class="depth-frame-4">
+                <div class="depth-frame-5">
+                  <p class="p">Drag and drop your video file here</p>
+                </div>
+                <div class="depth-frame-6">
+                  <p class="text-wrapper-2">Or, click to select a video file from your computer</p>
+                </div>
+              </div>
+              <div class="depth-frame-7">
+                <div class="depth-frame-8 clickable" id="fileTrigger">
+                  <div class="text-wrapper-3">Select Video</div>
+                </div>
+                <input type="file" id="fileInput" accept=".mp4,.mov,.avi,.mkv" />
+              </div>
+              <!-- 파일 목록 표시 -->
+              <div id="fileList"></div>
+              
+              <!-- 팀 색상 선택 -->
+              <div class="team-colors" id="teamColors" style="display: none;">
+                <div class="color-input-group">
+                  <label for="team1Color">Team 1 Color</label>
+                  <input type="color" id="team1Color" value="#aa4646">
+                </div>
+                <div class="color-input-group">
+                  <label for="team2Color">Team 2 Color</label>
+                  <input type="color" id="team2Color" value="#3c5096">
+                </div>
+              </div>
+              
+              <!-- 분석 시작 버튼 -->
+              <button class="start-button" id="startAnalysis" style="display: none;" disabled>
+                Start Analysis
+              </button>
+            </div>
+          </div>
+          <div class="depth-frame-9">
+            <p class="text-wrapper-4">
+              Supported file types: MP4, MOV, AVI, MKV. Maximum file size: 5GB
+            </p>
+            <div id="outputPathInfo" style="margin-top: 10px; font-size: 12px; color: #666; text-align: center; word-break: break-all;"></div>
+          </div>
+        </div>
+        <div class="depth-frame-10">
+          <div class="depth-frame-11">
+            <div class="icon-wrapper">
+              <img class="vector" src="./static/img/icon.svg" />
+            </div>
+            <div class="depth-frame-12">
+              <div class="text-wrapper-5">Simple Soccer Detector</div>
+            </div>
+          </div>
+          <div class="depth-frame-13">
+            <div class="depth-frame-14"></div>
+<!--            <div class="depth-frame-16">-->
+<!--              <div class="depth-frame-8">-->
+<!--                <div class="text-wrapper-6">Home</div>-->
+<!--              </div>-->
+<!--            </div>-->
+            <div class="depth-frame-16">
+              <div class="depth-frame-8">
+                <div class="text-wrapper-3">New Analyze</div>
+              </div>
+            </div>
+            <div class="circled-question-wrapper">
+              <img class="circled-question" src="./static/img/question.svg" />
+            </div>
+            <div class="circled-question-wrapper">
+              <img class="img" src="./static/img/user.svg" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      console.log('Main window loaded');
+      
+      const fileInput = document.getElementById('fileInput');
+      const fileTrigger = document.getElementById('fileTrigger');
+      const dropZone = document.getElementById('dropZone');
+      const fileList = document.getElementById('fileList');
+      const teamColors = document.getElementById('teamColors');
+      const startAnalysis = document.getElementById('startAnalysis');
+      const outputPathInfo = document.getElementById('outputPathInfo');
+
+      let currentFile = null;
+      const allowedExtensions = ['mp4', 'mov', 'avi', 'mkv'];
+
+      // 페이지 로드 시 출력 경로 표시
+      async function showOutputPath() {
+        try {
+          const result = await window.electron.ipcRenderer.invoke('get-output-path');
+          if (result.success) {
+            outputPathInfo.innerHTML = `📁 결과 파일 저장 위치: ${result.path}`;
+          }
+        } catch (error) {
+          console.error('Error getting output path:', error);
+        }
+      }
+
+      // 페이지 로드 시 실행
+      showOutputPath();
+
+      fileTrigger.addEventListener('click', () => fileInput.click());
+
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+          handleFile(fileInput.files[0]);
+        }
+      });
+
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+          handleFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      function handleFile(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!allowedExtensions.includes(ext)) {
+          alert(`❗ "${file.name}"은 지원되지 않는 확장자입니다.`);
+          return;
+        }
+
+        currentFile = file;
+        renderFileList();
+        teamColors.style.display = 'flex';
+        startAnalysis.style.display = 'block';
+        startAnalysis.disabled = false;
+      }
+
+      function renderFileList() {
+        if (!currentFile) {
+          fileList.innerHTML = '';
+          return;
+        }
+
+        fileList.innerHTML = `
+          <div class="file-item">
+            <span>📄 ${currentFile.name}</span>
+            <span class="file-remove" onclick="removeFile()">❌</span>
+          </div>
+        `;
+      }
+
+      function removeFile() {
+        currentFile = null;
+        renderFileList();
+        teamColors.style.display = 'none';
+        startAnalysis.style.display = 'none';
+        fileInput.value = '';
+      }
+
+      startAnalysis.addEventListener('click', async () => {
+        if (!currentFile) {
+          alert('파일을 선택해주세요.');
+          return;
+        }
+
+        const team1Color = document.getElementById('team1Color').value;
+        const team2Color = document.getElementById('team2Color').value;
+
+        try {
+          startAnalysis.disabled = true;
+          startAnalysis.textContent = 'Uploading...';
+
+          // 파일을 ArrayBuffer로 읽기
+          const arrayBuffer = await currentFile.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          // 파일 저장
+          const saveResult = await window.electron.ipcRenderer.invoke('save-video', Array.from(uint8Array));
+          
+          if (!saveResult.success) {
+            throw new Error(saveResult.error || '파일 저장에 실패했습니다.');
+          }
+
+          // 분석 시작
+          const analysisResult = await window.electron.ipcRenderer.invoke('start-analysis', {
+            videoPath: 'output/input_video.mp4',
+            team1Color: team1Color,
+            team2Color: team2Color
+          });
+
+          if (analysisResult.success) {
+            // 분석 페이지로 이동하지 않음 (main.js에서 자동으로 분석 윈도우 생성)
+            startAnalysis.textContent = 'Analysis Started!';
+          } else {
+            throw new Error(analysisResult.error || '분석 시작에 실패했습니다.');
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          alert('오류가 발생했습니다: ' + error.message);
+          startAnalysis.disabled = false;
+          startAnalysis.textContent = 'Start Analysis';
+        }
+      });
+
+      // 페이지 로드 완료 시
+      window.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM Content Loaded');
+        
+        // Start Analysis 버튼 클릭 시 로그
+        const startButton = document.getElementById('startAnalysis');
+        if (startButton) {
+          startButton.addEventListener('click', () => {
+            console.log('Start Analysis button clicked');
+          });
+        }
+      });
+    </script>
+  </body>
+</html>

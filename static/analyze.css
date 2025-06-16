@@ -1,0 +1,299 @@
+.screen {
+  background-color: #fcf7f7;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: top left;
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-35%, -35%) scale(0.7);
+}
+
+  .screen .div {
+    background-color: #fcf7f7;
+    width: 1920px;
+    height: 1080px;
+    position: relative;
+  }
+  
+  .screen .depth-frame {
+    display: flex;
+    width: 960px;
+    flex-direction: column;
+    max-width: 960px;
+    align-items: center;
+    position: absolute;
+
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  
+  .screen .depth-frame-wrapper {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 12px 12px;
+    padding: 16px;
+    position: relative;
+    flex: 0 0 auto;
+  }
+  
+  .screen .div-wrapper {
+    display: inline-flex;
+    flex-direction: column;
+    min-width: 288px;
+    align-items: center;
+    position: relative;
+    flex: 0 0 auto;
+  }
+  
+  .screen .text-wrapper {
+    position: relative;
+    width: fit-content;
+    top: -110px;
+    font-family: "Plus Jakarta Sans-Bold", Helvetica;
+    font-weight: 700;
+    color: #1c0c0c;
+    font-size: 32px;
+    letter-spacing: 0;
+    line-height: 40px;
+    white-space: nowrap;
+  }
+  
+  .screen .depth-frame-2 {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    align-self: stretch;
+    width: 100%;
+    position: relative;
+    flex: 0 0 auto;
+  }
+  
+  .screen .depth-frame-3 {
+    display: flex;
+    flex-direction: column;
+    height: 474px;
+    align-items: center;
+    gap: 24px;
+    padding: 20px 24px;
+    position: relative;
+    align-self: stretch;
+    width: 100%;
+  }
+  
+  .screen .depth-frame-4 {
+    position: relative;
+    max-width: 480px;
+    width: 278px;
+    height: 52px;
+  }
+  
+  .screen .depth-frame-5 {
+    display: inline-flex;
+    left: 1414px;
+    flex-direction: column;
+    max-width: 960px;
+    align-items: center;
+    position: absolute;
+    top: 251px;
+  }
+  
+  .screen .depth-frame-6 {
+    position: relative;
+    max-width: 480px;
+    width: 278px;
+    height: 52px;
+    margin-left: -19.00px;
+    margin-right: -19.00px;
+  }
+  
+  .screen .depth-frame-7 {
+    display: flex;
+    width: 1920px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 40px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-color: #e5e8ea;
+  }
+  
+  .screen .depth-frame-8 {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  .screen .icon-wrapper {
+    position: relative;
+    flex: 1;
+    width: 16px;
+    flex-grow: 1;
+  }
+  
+  .screen .vector {
+    position: relative;
+    width: 24px;
+    height: 24px;
+  }
+
+
+  .screen .depth-frame-9 {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+
+  
+  .screen .text-wrapper-2 {
+    position: relative;
+    align-self: stretch;
+    margin-top: -1.00px;
+    font-family: "Plus Jakarta Sans-Bold", Helvetica;
+    font-weight: 700;
+    color: #1c0c0c;
+    font-size: 18px;
+    letter-spacing: 0;
+    line-height: 23px;
+    white-space: nowrap;
+  }
+  
+  .screen .depth-frame-10 {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 32px;
+    position: relative;
+    flex: 1;
+    flex-grow: 1;
+  }
+  
+  .screen .depth-frame-11 {
+    display: inline-flex;
+    height: 40px;
+    align-items: center;
+    gap: 36px;
+    position: relative;
+    flex: 0 0 auto;
+  }
+  
+  .screen .depth-frame-12 {
+    position: relative;
+    width: 41px;
+    height: 21px;
+  }
+  
+  .screen .depth-frame-13 {
+    display: inline-flex;
+    min-width: 84px;
+    max-width: 480px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 0px 16px;
+    background-color: #f2e8e8;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    flex: 0 0 auto;
+  }
+  
+  .screen .depth-frame-14 {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    flex: 0 0 auto;
+  }
+  
+  .screen .text-wrapper-3 {
+    position: relative;
+    align-self: stretch;
+    margin-top: -1.00px;
+    font-family: "Plus Jakarta Sans-Bold", Helvetica;
+    font-weight: 700;
+    color: #1c0c0c;
+    font-size: 14px;
+    text-align: center;
+    letter-spacing: 0;
+    line-height: 21px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+  }
+  
+  .screen .text-wrapper-4 {
+    position: relative;
+    align-self: stretch;
+    margin-top: -1.00px;
+    font-family: "Plus Jakarta Sans-Bold", Helvetica;
+    font-weight: 700;
+    color: #1c0c0c;
+    font-size: 14px;
+    text-align: center;
+    letter-spacing: 0;
+    line-height: 21px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+  }
+  
+  .screen .circled-question-wrapper {
+    display: inline-flex;
+    max-width: 480px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0px 10px;
+    position: relative;
+    flex: 0 0 auto;
+    background-color: #f2e8e8;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  
+  .screen .circled-question-wrapper {
+    display: inline-flex;
+    max-width: 480px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0px 10px;
+    background-color: #f2e8e8;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    flex: 0 0 auto;
+  }
+  .screen .circled-question {
+    position: relative;
+    width: 24px;
+    height: 24px;
+  }
+  
+  .screen .img {
+    position: relative;
+    width: 24px;
+    height: 24px;
+  }

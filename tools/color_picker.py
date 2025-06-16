@@ -141,7 +141,7 @@ class RealTimeColorDisplay:
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
-def integrate_realtime_colors(frame, combined_mask, color_display, color_space="hsv"):
+def integrate_realtime_colors(frame, combined_mask, color_space="hsv"):
     """
     기존 process_video 함수에 추가할 수 있는 함수.
     color_space에 따라 지정된 형식으로 dominant color 반환
@@ -149,7 +149,6 @@ def integrate_realtime_colors(frame, combined_mask, color_display, color_space="
     Args:
         frame: 원본 프레임 (BGR)
         combined_mask: 마스크
-        color_display: RealTimeColorDisplay 객체
         color_space: "rgb", "bgr", "hsv" 중 하나
     
     Returns:
@@ -158,9 +157,7 @@ def integrate_realtime_colors(frame, combined_mask, color_display, color_space="
     
     # Top 3 dominant colors 추출
     dominant_colors = get_dominant_colors(frame, combined_mask, n_colors=3, color_space=color_space)
-    
-    # 실시간 display 업데이트
-    color_display.update_display(dominant_colors, color_space)
+
     
     # 콘솔에도 출력 (지정된 color_space 기준)
     if dominant_colors:
