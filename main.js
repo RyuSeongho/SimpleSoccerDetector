@@ -34,7 +34,6 @@ function createWindow() {
   });
 
   mainWindow.loadFile('main.html');
-  mainWindow.webContents.openDevTools();
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -53,8 +52,7 @@ function createAnalyzeWindow() {
   });
 
   analyzeWindow.loadFile('analyze.html');
-  analyzeWindow.webContents.openDevTools();
-
+  
   analyzeWindow.on('closed', () => {
     analyzeWindow = null;
   });
